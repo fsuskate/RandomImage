@@ -13,7 +13,7 @@
         <Button Click="Button_Click">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
-                    <Image Grid.ColumnSpan="3" Source="{Binding Bitmap}"/>
+                    <Image Grid.ColumnSpan="3" Source="{Binding Bitmap}" ToolTip="{Binding Description}"/>
                 </ControlTemplate>
             </Button.Template>
         </Button>

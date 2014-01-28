@@ -83,7 +83,13 @@ namespace RandomImage
             //ImageSrc = GetRandomImageUrl();
 
             Random rand = new Random();
-            ImageSrc = RandomImageList[rand.Next(0, RandomImageList.Count)];
+            int randomIndex = rand.Next(0, RandomImageList.Count);
+
+            if (RandomImageList != null)
+            {
+                ImageSrc = RandomImageList[randomIndex].link;
+                Description = RandomImageList[randomIndex].title;
+            }
 
             BitmapImage bm = new BitmapImage();
             bm.BeginInit();
@@ -95,61 +101,64 @@ namespace RandomImage
 
         public void DoImgurAuth()
         {
-            string clientId = "";
+            string clientId = "f609571ab85f649";
             string authUrl = "https://api.imgur.com/3/gallery/random/random/0";
             
             try
             {
                 HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(authUrl);
-                httpWebRequest.Method = "GET";
-                httpWebRequest.Headers.Add("Authorization", "Client-ID " + clientId);
-                
-                HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-                if (httpWebResponse.StatusCode == HttpStatusCode.OK)
+                if (httpWebRequest != null)
                 {
-                    RandomImageList = new List<string>();
-                    StringBuilder strBuilder = new StringBuilder();
-                    Stream stream = httpWebResponse.GetResponseStream();
-                    Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
-                    StreamReader readStream = new StreamReader(stream, encode);
-                    Char[] read = new Char[1024];
-                    int count = readStream.Read(read, 0, 1024);
-                    while (count > 0)
+                    httpWebRequest.Method = "GET";
+                    httpWebRequest.Headers.Add("Authorization", "Client-ID " + clientId);
+
+                    HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+                    if (httpWebResponse != null && httpWebResponse.StatusCode == HttpStatusCode.OK)
                     {
-                        strBuilder.Append(read);
-                        //Console.WriteLine(str);
-                        count = readStream.Read(read, 0, 1024);
+                        RandomImageList = new List<ImgurJsonData>();
+                        StringBuilder strBuilder = new StringBuilder();
+                        Stream stream = httpWebResponse.GetResponseStream();
+                        Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
+                        StreamReader readStream = new StreamReader(stream, encode);
+                        Char[] read = new Char[1024];
+                        int count = readStream.Read(read, 0, 1024);
+                        while (count > 0)
+                        {
+                            strBuilder.Append(read);
+                            //Console.WriteLine(str);
+                            count = readStream.Read(read, 0, 1024);
+                        }
+
+                        string str = strBuilder.ToString();
+                        str = str.Substring(9);
+                        string[] images = str.Split('}');
+
+                        foreach (string imageStr in images)
+                        {
+                            string temp = imageStr + "}";
+                            if (temp[0] == ',') temp = temp.Substring(1);
+                            //Console.WriteLine(temp);
+
+                            ImgurJsonData imgurObj = null;
+                            try
+                            {
+                                imgurObj = JsonConvert.DeserializeObject<ImgurJsonData>(temp);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine(ex.Message);
+                            }
+                            if (imgurObj != null)
+                            {
+                                Console.WriteLine(imgurObj.link);
+                                RandomImageList.Add(imgurObj);
+                            }
+                        }
+
+                        readStream.Close();
                     }
-
-                    string str = strBuilder.ToString();
-                    str = str.Substring(9);
-                    string[] images = str.Split('}');
-
-                    foreach (string imageStr in images)
-                    {
-                        string temp = imageStr + "}";
-                        if (temp[0] == ',') temp = temp.Substring(1);
-                        //Console.WriteLine(temp);
-
-                        ImgurJsonData imgurObj = null;
-                        try
-                        {
-                            imgurObj = JsonConvert.DeserializeObject<ImgurJsonData>(temp);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine(ex.Message);
-                        }
-                        if (imgurObj != null)
-                        {
-                            Console.WriteLine(imgurObj.link);
-                            RandomImageList.Add(imgurObj.link);
-                        }
-                    }
-                    
-                    readStream.Close();
+                    httpWebResponse.Close();
                 }
-                httpWebResponse.Close();
             }
             catch (Exception ex)
             {
@@ -161,7 +170,7 @@ namespace RandomImage
 
         #region Properties
 
-        public List<string> RandomImageList
+        public List<ImgurJsonData> RandomImageList
         {
             get;
             set;
@@ -171,6 +180,24 @@ namespace RandomImage
         {
             get;
             set;
+        }
+
+        private string descripton = "";
+        public string Description
+        {
+            get
+            {
+                return descripton;
+            }
+
+            set
+            {
+                if (value != descripton)
+                {
+                    descripton = value;
+                    OnPropertyChanged("Description");
+                }
+            }
         }
 
         private BitmapImage bm = null;
