@@ -1,18 +1,19 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
-using Newtonsoft.Json;
 
 namespace RandomImage
 {
     public class DataViewModel : INotifyPropertyChanged
     {
+        private const string clientId = "f609571ab85f649";
+        private const string authUrl = "https://api.imgur.com/3/gallery/random/random/0";
+
         #region INotifyPropertyChanged
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -28,60 +29,8 @@ namespace RandomImage
 
         #region Methods
 
-        public string GenerateRamdomImageUrl(int length = 6)
+        public void NextRandomImage()
         {
-            string allChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-            string url = "http://imgur.com/";
-
-            Random rand = new Random();
-            for (int i = 0; i < length; i++)
-            {
-                url += allChars[rand.Next(0, allChars.Length)];
-            }
-
-            return url += ".jpg";            
-        }
-
-        public string GetRandomImageUrl()
-        {
-            string randomImageUrl = GenerateRamdomImageUrl(5);
-
-            //string randomImageUrl = "";
-            //for (int i = 0; i < Retries; i++)
-            //{
-            //    randomImageUrl = GenerateRamdomImageUrl();
-
-            //    try
-            //    {
-            //        HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(randomImageUrl);
-            //        httpWebRequest.Method = "HEAD";
-            //        httpWebRequest.Timeout = 10000;
-
-            //        HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-
-            //        if (httpWebResponse.ResponseUri.LocalPath == "/removed.png")
-            //        {
-            //            Console.WriteLine("\nBad image url");
-            //        }
-            //        else
-            //        {
-            //            break;
-            //        }
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        Console.WriteLine("Exception: {0}", ex.Message );
-            //        Console.WriteLine(" Url: {0}", randomImageUrl);
-            //    }
-            //}
-
-            return randomImageUrl;
-        }
-
-        public void RandomImage()
-        {
-            //ImageSrc = GetRandomImageUrl();
-
             Random rand = new Random();
             int randomIndex = rand.Next(0, RandomImageList.Count);
 
@@ -89,76 +38,85 @@ namespace RandomImage
             {
                 ImageSrc = RandomImageList[randomIndex].link;
                 Description = RandomImageList[randomIndex].title;
-            }
-
-            BitmapImage bm = new BitmapImage();
-            bm.BeginInit();
-            bm.UriSource = new Uri(ImageSrc, UriKind.Absolute);
-            bm.EndInit();
-
-            Bitmap = bm;            
+            }           
         }
 
-        public void DoImgurAuth()
+        protected Stream GetImgurImageStream()
         {
-            string clientId = "f609571ab85f649";
-            string authUrl = "https://api.imgur.com/3/gallery/random/random/0";
-            
+            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(authUrl);
+            if (httpWebRequest != null)
+            {
+                httpWebRequest.Method = "GET";
+                httpWebRequest.Headers.Add("Authorization", "Client-ID " + clientId);
+
+                HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+                if (httpWebResponse != null && httpWebResponse.StatusCode == HttpStatusCode.OK)
+                {
+                    // No need to close the connection using httpWebResponse.Close() since we will close the 
+                    // response stream later.
+                    return httpWebResponse.GetResponseStream();                   
+                }
+            }
+            return null;
+        }
+
+        protected string ReadImageDataFromStream(Stream stream)
+        {
+            if (stream == null)
+            {
+                throw new InvalidDataException("Null stream passed to ReadImageDataFromStream");
+            }
+
+            StringBuilder strBuilder = new StringBuilder();
+            StreamReader readStream = new StreamReader(stream, Encoding.GetEncoding("utf-8"));
+            Char[] readBuffer = new Char[1024];
+            int count = readStream.Read(readBuffer, 0, 1024);
+            while (count > 0)
+            {
+                strBuilder.Append(readBuffer);
+                count = readStream.Read(readBuffer, 0, 1024);
+            }
+            readStream.Close();
+            stream.Close();
+
+            return strBuilder.ToString().Substring(9); 
+        }
+
+        protected void ConvertImageDataToImages(string strImageData)
+        {
+            if (string.IsNullOrEmpty(strImageData))
+            {
+                throw new InvalidDataException("Empty image data passed to ConvertImageDataToImages");
+            }
+
+            string[] images = strImageData.Split('}');
+            foreach (string imageStr in images)
+            {
+                string temp = imageStr + "}";
+                if (temp[0] == ',') temp = temp.Substring(1);
+
+                ImgurJsonData imgurObj = null;
+                try
+                {
+                    imgurObj = JsonConvert.DeserializeObject<ImgurJsonData>(temp);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+
+                if (imgurObj != null)
+                {
+                    RandomImageList.Add(imgurObj);
+                }
+            }
+        }
+
+        public void GetRandomImages()
+        {
             try
             {
-                HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(authUrl);
-                if (httpWebRequest != null)
-                {
-                    httpWebRequest.Method = "GET";
-                    httpWebRequest.Headers.Add("Authorization", "Client-ID " + clientId);
-
-                    HttpWebResponse httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-                    if (httpWebResponse != null && httpWebResponse.StatusCode == HttpStatusCode.OK)
-                    {
-                        RandomImageList = new List<ImgurJsonData>();
-                        StringBuilder strBuilder = new StringBuilder();
-                        Stream stream = httpWebResponse.GetResponseStream();
-                        Encoding encode = System.Text.Encoding.GetEncoding("utf-8");
-                        StreamReader readStream = new StreamReader(stream, encode);
-                        Char[] read = new Char[1024];
-                        int count = readStream.Read(read, 0, 1024);
-                        while (count > 0)
-                        {
-                            strBuilder.Append(read);
-                            //Console.WriteLine(str);
-                            count = readStream.Read(read, 0, 1024);
-                        }
-
-                        string str = strBuilder.ToString();
-                        str = str.Substring(9);
-                        string[] images = str.Split('}');
-
-                        foreach (string imageStr in images)
-                        {
-                            string temp = imageStr + "}";
-                            if (temp[0] == ',') temp = temp.Substring(1);
-                            //Console.WriteLine(temp);
-
-                            ImgurJsonData imgurObj = null;
-                            try
-                            {
-                                imgurObj = JsonConvert.DeserializeObject<ImgurJsonData>(temp);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine(ex.Message);
-                            }
-                            if (imgurObj != null)
-                            {
-                                Console.WriteLine(imgurObj.link);
-                                RandomImageList.Add(imgurObj);
-                            }
-                        }
-
-                        readStream.Close();
-                    }
-                    httpWebResponse.Close();
-                }
+                ConvertImageDataToImages(ReadImageDataFromStream(GetImgurImageStream()));                
             }
             catch (Exception ex)
             {
@@ -170,16 +128,17 @@ namespace RandomImage
 
         #region Properties
 
+        private List<ImgurJsonData> randomImageList;
         public List<ImgurJsonData> RandomImageList
         {
-            get;
-            set;
-        }
-
-        public int Retries
-        {
-            get;
-            set;
+            get
+            {
+                if (randomImageList == null)
+                {
+                    randomImageList = new List<ImgurJsonData>();
+                }
+                return randomImageList;
+            }
         }
 
         private string descripton = "";
@@ -200,29 +159,20 @@ namespace RandomImage
             }
         }
 
-        private BitmapImage bm = null;
+        private BitmapImage bitmapImage = null;
         public BitmapImage Bitmap
         {
             get
             {
-                if (bm == null)
+                if (bitmapImage == null)
                 {
-                    bm = new BitmapImage();
-                    bm.BeginInit();
-                    bm.UriSource = new Uri(imageSrc, UriKind.Absolute);
-                    bm.EndInit();
+                    bitmapImage = GetBitmapFromUri();
                 }
-                return bm;
-            }
-
-            set
-            {
-                bm = value;
-                OnPropertyChanged("Bitmap");
+                return bitmapImage;
             }
         }
 
-        private string imageSrc = "http://imgur.com/wZ3eK.jpg";
+        private string imageSrc = "http://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Imgur_logo.svg/800px-Imgur_logo.svg.png";
         public string ImageSrc
         {
             get
@@ -234,12 +184,23 @@ namespace RandomImage
             {
                 if (!string.IsNullOrEmpty(value))
                 {
-
                     imageSrc = value;
                     OnPropertyChanged("ImageSrc");
+
+                    bitmapImage = null;
+                    OnPropertyChanged("Bitmap");
                 }
             }
         }
         #endregion
+
+        protected BitmapImage GetBitmapFromUri()
+        {
+            BitmapImage bitmapImage = new BitmapImage();
+            bitmapImage.BeginInit();
+            bitmapImage.UriSource = new Uri(ImageSrc, UriKind.Absolute);
+            bitmapImage.EndInit();
+            return bitmapImage;
+        }
     }
 }

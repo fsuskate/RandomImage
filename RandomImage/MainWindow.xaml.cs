@@ -26,14 +26,12 @@ namespace RandomImage
             InitializeComponent();
 
             DataContext = new DataViewModel();
-            (DataContext as DataViewModel).Retries = 10;
-
-            (DataContext as DataViewModel).DoImgurAuth();
+            (DataContext as DataViewModel).GetRandomImages();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            (DataContext as DataViewModel).RandomImage();
+            (DataContext as DataViewModel).NextRandomImage();
         }
     }
 }
