@@ -24,9 +24,7 @@ namespace RandomImage
         public MainWindow()
         {
             InitializeComponent();
-
             DataContext = new DataViewModel();
-            (DataContext as DataViewModel).GetRandomImages();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
