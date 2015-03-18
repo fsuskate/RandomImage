@@ -56,16 +56,7 @@ namespace RandomImage
                 Console.WriteLine(ex.Message);
             }
             return null;
-        }
-
-        protected BitmapImage GetBitmapFromUri()
-        {
-            BitmapImage bitmapImage = new BitmapImage();
-            bitmapImage.BeginInit();
-            bitmapImage.UriSource = new Uri(ImageSrc, UriKind.Absolute);
-            bitmapImage.EndInit();
-            return bitmapImage;
-        }
+        }        
 
         #endregion
 
@@ -109,7 +100,7 @@ namespace RandomImage
             {
                 if (bitmapImage == null)
                 {
-                    bitmapImage = GetBitmapFromUri();
+                    bitmapImage = ImageSrc.GetBitmapFromUri();
                 }
                 return bitmapImage;
             }

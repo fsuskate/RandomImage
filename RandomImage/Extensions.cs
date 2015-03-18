@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Windows.Media.Imaging;
 
 namespace RandomImage
 {
@@ -60,6 +61,15 @@ namespace RandomImage
                 }
             }
             return imgurJsonDataList;
+        }
+
+        public static BitmapImage GetBitmapFromUri(this string imageSrc)
+        {
+            BitmapImage bitmapImage = new BitmapImage();
+            bitmapImage.BeginInit();
+            bitmapImage.UriSource = new Uri(imageSrc, UriKind.Absolute);
+            bitmapImage.EndInit();
+            return bitmapImage;
         }
     }
 }
